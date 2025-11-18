@@ -42,7 +42,7 @@ export class AuthService {
       // 3️⃣ Generate refresh token (valid 30 days)
       const refreshToken = this.jwtService.sign(
         { id: user.id, email: user.email },
-        { expiresIn: '30d' },
+        { expiresIn: process.env.REFRESH_JWT_EXPIRES_IN as number | undefined },
       );
 
       await this.tokenService.saveRefreshToken(user.id, refreshToken, manager);
@@ -72,7 +72,7 @@ export class AuthService {
 
     const refreshToken = this.jwtService.sign(
       { sub: user.id, email: user.email },
-      { expiresIn: '30d' },
+      { expiresIn: process.env.REFRESH_JWT_EXPIRES_IN as number | undefined },
     );
 
     await this.tokenService.saveRefreshToken(
