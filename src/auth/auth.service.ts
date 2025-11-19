@@ -11,6 +11,11 @@ import { DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.user.dto';
 import * as argon2 from 'argon2';
+import {
+  UserResponseDto,
+  UserWithPassword,
+} from 'src/user/dto/user.response.dto';
+import { JwtPayload } from './interface/jwt.payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -24,14 +29,15 @@ export class AuthService {
   /* ----------------------------------------------------
    * Helper: Generate both access + refresh tokens
    * --------------------------------------------------*/
-  private generateTokens(user: { id: string; email: string }) {
+  private generateTokens(user: { id: string; email: string; role: string }) {
     const accessToken = this.jwtService.sign({
       sub: user.id,
       email: user.email,
+      role: user.role,
     });
 
     const refreshToken = this.jwtService.sign(
-      { sub: user.id, email: user.email },
+      { sub: user.id, email: user.email, role: user.role },
       {
         expiresIn: process.env.REFRESH_JWT_EXPIRES_IN as number | undefined,
       },
@@ -64,7 +70,10 @@ export class AuthService {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      const user = await this.userService.createUser(registerDto, manager);
+      const user: UserResponseDto = await this.userService.createUser(
+        registerDto,
+        manager,
+      );
 
       const { accessToken, refreshToken } = this.generateTokens(user);
 
@@ -82,7 +91,8 @@ export class AuthService {
    * LOGIN
    * --------------------------------------------------*/
   async login(loginDto: LoginDto) {
-    const user = await this.userService.findByEmailWithPassword(loginDto.email);
+    const user: UserWithPassword | null =
+      await this.userService.findByEmailWithPassword(loginDto.email);
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
@@ -103,7 +113,7 @@ export class AuthService {
     if (!refreshToken)
       throw new UnauthorizedException('Refresh token required');
 
-    let payload;
+    let payload : JwtPayload;
     try {
       payload = this.jwtService.verify(refreshToken);
     } catch {
@@ -117,8 +127,8 @@ export class AuthService {
       throw new ForbiddenException('Refresh token is invalid or expired');
     }
 
-    const { sub: userId, email } = payload;
-    const newTokens = this.generateTokens({ id: userId, email });
+    const { sub: userId, email, role } = payload;
+    const newTokens = this.generateTokens({ id: userId, email, role });
 
     await this.storeRefreshToken(userId, newTokens.refreshToken);
 
