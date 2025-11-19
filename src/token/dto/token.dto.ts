@@ -1,6 +1,6 @@
 import { IsOptional, IsString } from 'class-validator';
 
-export class ReturnTokenDto {
+export class TokenDto {
   @IsOptional()
   @IsString()
   accessToken?: string;

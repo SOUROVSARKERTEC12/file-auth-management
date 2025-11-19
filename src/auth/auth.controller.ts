@@ -4,7 +4,7 @@ import { UserService } from 'src/user/user.service';
 import { RegisterDto } from './dto/register.user.dto';
 import { LoginDto } from './dto/login.user.dto';
 import { JwtAuthGuard } from './guard/jw.auth.guard';
-import { ReturnTokenDto } from 'src/token/dto/token.dto';
+import { TokenDto } from 'src/token/dto/token.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -27,15 +27,14 @@ export class AuthController {
     return this.authService.getProfile(userId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('refresh')
-  async refresh(@Body() refreshTokenDto: ReturnTokenDto) {
+  async refresh(@Body() refreshTokenDto: TokenDto) {
     return this.authService.refresh(refreshTokenDto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  
   @Post('logout')
-  async logout(@Body() refreshTokenDto: ReturnTokenDto) {
+  async logout(@Body() refreshTokenDto: TokenDto) {
     return this.authService.logout(refreshTokenDto);
   }
 }
