@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -85,5 +86,62 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  async refresh(refreshTokenDto: { refreshToken: string }) {
+    const { refreshToken } = refreshTokenDto;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token required');
+    }
+
+    // 1️⃣ Decode token (do NOT trust it yet)
+    let payload: { sub: string; email: string; iat: number; exp: number };
+    try {
+      payload = this.jwtService.verify(refreshToken);
+    } catch (e) {
+      throw new ForbiddenException('Invalid refresh token');
+    }
+
+    const userId = payload.sub;
+
+    // 2️⃣ Check if refresh token exists in DB
+    const tokenExists =
+      await this.tokenService.findByRefreshToken(refreshToken);
+
+    if (!tokenExists) {
+      throw new ForbiddenException('Refresh token is invalid or expired');
+    }
+
+    // 3️⃣ Generate new tokens (token rotation)
+    const newAccessToken = this.jwtService.sign({
+      sub: userId,
+      email: payload.email,
+    });
+
+    const newRefreshToken = this.jwtService.sign(
+      { sub: userId, email: payload.email },
+      { expiresIn: process.env.REFRESH_JWT_EXPIRES_IN as number | undefined },
+    );
+
+    // 4️⃣ Replace old refresh token in DB
+    await this.tokenService.saveRefreshToken(
+      userId,
+      newRefreshToken,
+      this.dataSource.manager,
+    );
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
+  }
+
+  async logout(refreshTokenDto: { refreshToken: string }) {
+    return this.tokenService.deleteRefreshToken(refreshTokenDto.refreshToken);
+  }
+
+  async getProfile(userId: string) {
+    return this.userService.findByUserId(userId);
   }
 }
