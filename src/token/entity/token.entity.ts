@@ -2,10 +2,10 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
 } from 'typeorm';
 import { User } from 'src/user/entity/user.entity';
 
@@ -20,7 +20,7 @@ export class Token {
   @Column({ type: 'uuid' })
   userId: string;
 
-  @ManyToOne(() => User, (user) => user.tokens, {
+  @OneToOne(() => User, (user) => user.token, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'userId' })

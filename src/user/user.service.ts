@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RegisterDto } from 'src/auth/dto/register.user.dto';
 import { User } from './entity/user.entity';
@@ -30,10 +30,17 @@ export class UserService {
   }
 
   async findByUserId(id: string): Promise<Omit<User, 'password'> | null> {
-    const user = await this.usersRepository.findOneBy({ id });
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      relations: ['token'],
+    });
 
     if (!user) {
       return null;
+    }
+
+    if (!user?.token) {
+      throw new ForbiddenException('Token is invalid or expired');
     }
 
     const { password, ...userWithoutPassword } = user;

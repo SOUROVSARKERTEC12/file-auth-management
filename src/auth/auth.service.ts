@@ -54,7 +54,11 @@ export class AuthService {
     refreshToken: string,
     manager = this.dataSource.manager,
   ) {
-    return this.tokenService.saveRefreshToken(userId, refreshToken, manager);
+    return await this.tokenService.saveRefreshToken(
+      userId,
+      refreshToken,
+      manager,
+    );
   }
 
   /* ----------------------------------------------------
@@ -113,7 +117,7 @@ export class AuthService {
     if (!refreshToken)
       throw new UnauthorizedException('Refresh token required');
 
-    let payload : JwtPayload;
+    let payload: JwtPayload;
     try {
       payload = this.jwtService.verify(refreshToken);
     } catch {
@@ -139,13 +143,21 @@ export class AuthService {
    * LOGOUT
    * --------------------------------------------------*/
   async logout({ refreshToken }: { refreshToken: string }) {
-    return this.tokenService.deleteRefreshToken(refreshToken);
+    const tokenExists =
+      await this.tokenService.findByRefreshToken(refreshToken);
+
+    if (!tokenExists) {
+      throw new ForbiddenException('Refresh token is invalid or expired');
+    }
+    await this.tokenService.deleteRefreshToken(refreshToken);
+
+    return { message: 'Logged out successfully' };
   }
 
   /* ----------------------------------------------------
    * PROFILE
    * --------------------------------------------------*/
   async getProfile(userId: string) {
-    return this.userService.findByUserId(userId);
+    return await this.userService.findByUserId(userId);
   }
 }

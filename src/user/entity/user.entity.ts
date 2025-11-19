@@ -5,7 +5,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
+  OneToOne,
 } from 'typeorm';
 
 export enum UserRole {
@@ -44,8 +44,6 @@ export class User {
   @UpdateDateColumn({ type: 'timestamp' })
   updatedAt: Date;
 
-  @OneToMany(() => Token, (token) => token.user)
-  tokens: Token[];
+  @OneToOne(() => Token, (token) => token.user)
+  token: {};
 }
-
-
