@@ -21,32 +21,54 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  /* ----------------------------------------------------
+   * Helper: Generate both access + refresh tokens
+   * --------------------------------------------------*/
+  private generateTokens(user: { id: string; email: string }) {
+    const accessToken = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+    });
+
+    const refreshToken = this.jwtService.sign(
+      { sub: user.id, email: user.email },
+      {
+        expiresIn: process.env.REFRESH_JWT_EXPIRES_IN as number | undefined,
+      },
+    );
+
+    return { accessToken, refreshToken };
+  }
+
+  /* ----------------------------------------------------
+   * Helper: Save refresh token (inside or outside Tx)
+   * --------------------------------------------------*/
+  private async storeRefreshToken(
+    userId: string,
+    refreshToken: string,
+    manager = this.dataSource.manager,
+  ) {
+    return this.tokenService.saveRefreshToken(userId, refreshToken, manager);
+  }
+
+  /* ----------------------------------------------------
+   * REGISTER
+   * --------------------------------------------------*/
   async register(registerDto: RegisterDto) {
-    const existUser = await this.userService.findByEmailWithPassword(
+    const existingUser = await this.userService.findByEmailWithPassword(
       registerDto.email,
     );
 
-    if (existUser) {
+    if (existingUser) {
       throw new BadRequestException('Email already exists');
     }
 
     return this.dataSource.transaction(async (manager) => {
-      // 1️⃣ Create user inside transaction
       const user = await this.userService.createUser(registerDto, manager);
 
-      // 2️⃣ Generate access token (valid 15 minutes)
-      const accessToken = this.jwtService.sign({
-        id: user.id,
-        email: user.email,
-      });
+      const { accessToken, refreshToken } = this.generateTokens(user);
 
-      // 3️⃣ Generate refresh token (valid 30 days)
-      const refreshToken = this.jwtService.sign(
-        { id: user.id, email: user.email },
-        { expiresIn: process.env.REFRESH_JWT_EXPIRES_IN as number | undefined },
-      );
-
-      await this.tokenService.saveRefreshToken(user.id, refreshToken, manager);
+      await this.storeRefreshToken(user.id, refreshToken, manager);
 
       return {
         user,
@@ -56,56 +78,38 @@ export class AuthService {
     });
   }
 
+  /* ----------------------------------------------------
+   * LOGIN
+   * --------------------------------------------------*/
   async login(loginDto: LoginDto) {
     const user = await this.userService.findByEmailWithPassword(loginDto.email);
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    // 2️⃣ Verify password
-    const isValid = await argon2.verify(user.password, loginDto.password);
-    if (!isValid) throw new UnauthorizedException('Invalid credentials');
+    const passwordValid = await argon2.verify(user.password, loginDto.password);
+    if (!passwordValid) throw new UnauthorizedException('Invalid credentials');
 
-    /// Generate tokens
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-    });
+    const { accessToken, refreshToken } = this.generateTokens(user);
 
-    const refreshToken = this.jwtService.sign(
-      { sub: user.id, email: user.email },
-      { expiresIn: process.env.REFRESH_JWT_EXPIRES_IN as number | undefined },
-    );
+    await this.storeRefreshToken(user.id, refreshToken);
 
-    await this.tokenService.saveRefreshToken(
-      user.id,
-      refreshToken,
-      this.dataSource.manager,
-    );
-
-    return {
-      accessToken,
-      refreshToken,
-    };
+    return { accessToken, refreshToken };
   }
 
-  async refresh(refreshTokenDto: { refreshToken: string }) {
-    const { refreshToken } = refreshTokenDto;
-
-    if (!refreshToken) {
+  /* ----------------------------------------------------
+   * REFRESH TOKEN
+   * --------------------------------------------------*/
+  async refresh({ refreshToken }: { refreshToken: string }) {
+    if (!refreshToken)
       throw new UnauthorizedException('Refresh token required');
-    }
 
-    // 1️⃣ Decode token (do NOT trust it yet)
-    let payload: { sub: string; email: string; iat: number; exp: number };
+    let payload;
     try {
       payload = this.jwtService.verify(refreshToken);
-    } catch (e) {
+    } catch {
       throw new ForbiddenException('Invalid refresh token');
     }
 
-    const userId = payload.sub;
-
-    // 2️⃣ Check if refresh token exists in DB
     const tokenExists =
       await this.tokenService.findByRefreshToken(refreshToken);
 
@@ -113,34 +117,24 @@ export class AuthService {
       throw new ForbiddenException('Refresh token is invalid or expired');
     }
 
-    // 3️⃣ Generate new tokens (token rotation)
-    const newAccessToken = this.jwtService.sign({
-      sub: userId,
-      email: payload.email,
-    });
+    const { sub: userId, email } = payload;
+    const newTokens = this.generateTokens({ id: userId, email });
 
-    const newRefreshToken = this.jwtService.sign(
-      { sub: userId, email: payload.email },
-      { expiresIn: process.env.REFRESH_JWT_EXPIRES_IN as number | undefined },
-    );
+    await this.storeRefreshToken(userId, newTokens.refreshToken);
 
-    // 4️⃣ Replace old refresh token in DB
-    await this.tokenService.saveRefreshToken(
-      userId,
-      newRefreshToken,
-      this.dataSource.manager,
-    );
-
-    return {
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-    };
+    return newTokens;
   }
 
-  async logout(refreshTokenDto: { refreshToken: string }) {
-    return this.tokenService.deleteRefreshToken(refreshTokenDto.refreshToken);
+  /* ----------------------------------------------------
+   * LOGOUT
+   * --------------------------------------------------*/
+  async logout({ refreshToken }: { refreshToken: string }) {
+    return this.tokenService.deleteRefreshToken(refreshToken);
   }
 
+  /* ----------------------------------------------------
+   * PROFILE
+   * --------------------------------------------------*/
   async getProfile(userId: string) {
     return this.userService.findByUserId(userId);
   }
