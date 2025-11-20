@@ -9,6 +9,7 @@ import { DatabaseModule } from './database/database.module';
 import { TokenModule } from './token/token.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
@@ -22,6 +23,11 @@ import { APP_GUARD } from '@nestjs/core';
           limit: 5,
         },
       ],
+    }),
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 30000, // 30 seconds
+      max: 100,
     }),
     AuthModule,
     UserModule,
