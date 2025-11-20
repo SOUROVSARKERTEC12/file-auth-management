@@ -1,34 +1,70 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UploadedFile,
+  UseInterceptors,
+  Get,
+  UseGuards,
+  Req,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { FileService } from './file.service';
-import { CreateFileDto } from './dto/create-file.dto';
-import { UpdateFileDto } from './dto/update-file.dto';
+import { CreateFileDto } from './dto/create.file.dto';
+import { UpdateFileDto } from './dto/update.file.dto';
+import { JwtAuthGuard } from 'src/auth/guard/jw.auth.guard';
+import { RolesGuard } from 'src/auth/guard/roles.guard';
+import { Roles } from 'src/auth/decorator/roles.decorator';
+import { UserRole } from 'src/user/enum/role.enum';
 
-@Controller('file')
+@UseGuards(JwtAuthGuard)
+@Controller('files')
 export class FileController {
   constructor(private readonly fileService: FileService) {}
 
-  @Post()
-  create(@Body() createFileDto: CreateFileDto) {
-    return this.fileService.create(createFileDto);
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(
+    @Req() req,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: CreateFileDto,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+    dto.userId = req.user.sub;
+    return this.fileService.create(file, dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Get()
-  findAll() {
+  async getAllFiles() {
     return this.fileService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.fileService.findOne(+id);
+  async getFileById(@Req() req, @Param('id') id: string) {
+    return this.fileService.findOne(id, req.user.sub);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateFileDto: UpdateFileDto) {
-    return this.fileService.update(+id, updateFileDto);
+  async updateFile(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() dto: UpdateFileDto,
+  ) {
+    return this.fileService.update(id, { ...dto, userId: req.user.sub });
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.fileService.remove(+id);
+  async deleteFile(@Req() req, @Param('id') id: string) {
+    return this.fileService.remove(id, req.user.sub);
   }
 }

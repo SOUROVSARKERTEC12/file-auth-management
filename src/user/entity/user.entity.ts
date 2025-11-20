@@ -6,10 +6,10 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToOne,
+  OneToMany,
 } from 'typeorm';
 import { UserRole } from '../enum/role.enum';
-
-
+import { FileEntity } from 'src/file/entities/file.entity';
 
 @Entity('user')
 export class User {
@@ -44,4 +44,7 @@ export class User {
 
   @OneToOne(() => Token, (token) => token.user)
   token: {};
+
+  @OneToMany(() => FileEntity, (file) => file.user)
+  files: FileEntity[];
 }

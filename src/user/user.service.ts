@@ -16,7 +16,6 @@ import { UserResponseDto } from './dto/user.response.dto';
 import { FindUserQueryDto } from './dto/find.user.query.dto';
 import { PaginationResponse } from 'src/common/interfaces/pagination.response.interface';
 
-
 @Injectable()
 export class UserService {
   // Track user-related cache keys only
@@ -85,7 +84,10 @@ export class UserService {
     const cacheKey = `users:${JSON.stringify(query)}`;
     this.userCacheKeys.add(cacheKey);
 
-    const cached = await this.cacheManager.get<PaginationResponse<UserResponseDto>>(cacheKey);
+    const cached =
+      await this.cacheManager.get<PaginationResponse<UserResponseDto>>(
+        cacheKey,
+      );
     if (cached) return cached;
 
     const {
@@ -127,6 +129,8 @@ export class UserService {
 
     const sanitized = items.map(({ password, ...u }) => u as UserResponseDto);
 
+    const totalPages = Math.ceil(total / limit);
+
     const response: PaginationResponse<UserResponseDto> = {
       data: sanitized,
       meta: {
@@ -134,7 +138,7 @@ export class UserService {
         itemCount: items.length,
         itemsPerPage: limit,
         currentPage: page,
-        totalPages: Math.ceil(total / limit),
+        totalPages: totalPages,
       },
     };
 

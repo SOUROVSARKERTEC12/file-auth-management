@@ -10,6 +10,7 @@ import { TokenModule } from './token/token.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { CacheModule } from '@nestjs/cache-manager';
+import { CloudinaryModule } from './file/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CacheModule } from '@nestjs/cache-manager';
     }),
     AuthModule,
     UserModule,
+    CloudinaryModule,
     FileModule,
     DatabaseModule,
     TokenModule,
