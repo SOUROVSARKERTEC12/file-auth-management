@@ -7,11 +7,21 @@ import { UserModule } from './user/user.module';
 import { FileModule } from './file/file.module';
 import { DatabaseModule } from './database/database.module';
 import { TokenModule } from './token/token.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, 
+      isGlobal: true,
+    }),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 60000,
+          limit: 5,
+        },
+      ],
     }),
     AuthModule,
     UserModule,
@@ -20,6 +30,12 @@ import { TokenModule } from './token/token.module';
     TokenModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

@@ -17,6 +17,7 @@ import { TokenDto } from 'src/token/dto/token.dto';
 import { Roles } from './decorator/roles.decorator';
 import { UserRole } from 'src/user/enum/role.enum';
 import { RolesGuard } from './guard/roles.guard';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
@@ -36,6 +37,8 @@ export class AuthController {
   registerAdmin(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   login(@Body() loginDto: LoginDto) {
