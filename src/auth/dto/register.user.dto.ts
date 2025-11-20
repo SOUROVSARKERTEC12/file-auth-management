@@ -6,7 +6,7 @@ import {
   IsEnum,
   IsStrongPassword,
 } from 'class-validator';
-import { UserRole } from 'src/user/entity/user.entity';
+import { UserRole } from 'src/user/enum/role.enum';
 
 export class RegisterDto {
   @IsNotEmpty({ message: 'First name is required.' })
