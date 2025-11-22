@@ -45,12 +45,12 @@ export class LoggerMiddleware implements NestMiddleware {
 
       const statusColor =
         statusCode >= 500
-          ? '\x1b[31m' // red
+          ? COLORS.serverError
           : statusCode >= 400
-            ? '\x1b[33m' // yellow
-            : '\x1b[32m'; // green
+            ? COLORS.clientError
+            : COLORS.success;
 
-      const resetColor = '\x1b[0m';
+      const resetColor = COLORS.reset;
 
       const logMessage =
         `[RESPONSE] ${method} ${originalUrl} ` +
@@ -70,3 +70,10 @@ export class LoggerMiddleware implements NestMiddleware {
     next();
   }
 }
+
+export const COLORS = {
+  success: '\x1b[36m', // Cyan
+  clientError: '\x1b[35m', // Magenta
+  serverError: '\x1b[34m', // Blue
+  reset: '\x1b[0m',
+};
