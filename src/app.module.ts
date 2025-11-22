@@ -12,6 +12,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { CacheModule } from '@nestjs/cache-manager';
 import { CloudinaryModule } from './file/cloudinary/cloudinary.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     FileModule,
     DatabaseModule,
     TokenModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [

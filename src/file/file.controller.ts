@@ -33,17 +33,36 @@ import { JwtAuthGuard } from 'src/auth/guard/jw.auth.guard';
 import { RolesGuard } from 'src/auth/guard/roles.guard';
 import { Roles } from 'src/auth/decorator/roles.decorator';
 import { UserRole } from 'src/user/enum/role.enum';
+import { FileValidationPipe } from './pipes/file-validation.pipe';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('files')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
 @Controller('files')
 export class FileController {
-  constructor(private readonly fileService: FileService) {}
+  private readonly fileValidationPipe: FileValidationPipe;
+
+  constructor(
+    private readonly fileService: FileService,
+    private readonly configService: ConfigService,
+  ) {
+    // Initialize file validation pipe with config
+    const maxFileSize =
+      this.configService.get<number>('MAX_FILE_SIZE') ||
+      10 * 1024 * 1024; // Default: 10MB
+    this.fileValidationPipe = new FileValidationPipe({
+      maxSize: maxFileSize,
+    });
+  }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({ summary: 'Upload a file', description: 'Upload a file to Cloudinary. The file will be associated with the authenticated user.' })
+  @ApiOperation({
+    summary: 'Upload a file',
+    description:
+      'Upload a file to Cloudinary. The file will be associated with the authenticated user. Maximum file size: 10MB (configurable via MAX_FILE_SIZE env variable). Allowed file types: images (jpg, png, gif, webp, svg), documents (pdf, doc, docx, xls, xlsx, ppt, pptx, txt, csv), archives (zip, rar), videos (mp4, mpeg, mov), and audio (mp3, wav).',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -52,7 +71,8 @@ export class FileController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'File to upload',
+          description:
+            'File to upload (max 10MB). Allowed types: images, documents, archives, videos, audio',
         },
         filename: {
           type: 'string',
@@ -69,8 +89,13 @@ export class FileController {
     },
   })
   @ApiResponse({ status: 201, description: 'File uploaded successfully' })
-  @ApiBadRequestResponse({ description: 'File is required or validation failed' })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized - Invalid or missing JWT token' })
+  @ApiBadRequestResponse({
+    description:
+      'File validation failed: file is required, file size exceeds limit, or file type is not allowed',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - Invalid or missing JWT token',
+  })
   async uploadFile(
     @Req() req,
     @UploadedFile() file: Express.Multer.File,
@@ -79,6 +104,10 @@ export class FileController {
     if (!file) {
       throw new BadRequestException('File is required');
     }
+
+    // Validate file using the validation pipe
+    this.fileValidationPipe.transform(file);
+
     dto.userId = req.user.sub;
     return this.fileService.create(file, dto);
   }
